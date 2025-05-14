@@ -1,2 +1,2 @@
 build: main.c
-	clang -lncurses main.c -o build && ./build
+	clang -lncurses main.c cJSON.c -o build && ./build

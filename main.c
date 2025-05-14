@@ -1,23 +1,24 @@
-#include <ctype.h>
 #include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include<unistd.h>
+#include <unistd.h>
+#include "cJSON.h"
 
 int SCREEN_WIDTH = 0;
 int SCREEN_HEIGHT = 0;
 int WINDOW_POSX = 0;
 int WINDOW_POSY = 0;
 
- int WINDOW_SIZEX = 50;
- int WINDOW_SIZEY = 25;
+int WINDOW_SIZEX = 50;
+int WINDOW_SIZEY = 25;
 
 #define true 1
 #define false 0
 
 enum DIRECTION {TOP, RIGHT, DOWN, LEFT};
 
-char snakestr[] = "[sexys<<<nak3sn4kesoc$$oolbabydolmonkey]";
+char snakestr[] = "[sexy<<<snake>>>--((xx))--game--&&--cool<->monkey]]]";
 
 typedef struct position {
 	int x;
@@ -33,7 +34,7 @@ struct snake {
 void init();
 void sleep_ms(int ms);
 void draw_snake(WINDOW* window, struct snake* snake);
-void draw_food(WINDOW* window);
+void draw_food(WINDOW* window, struct snake* snake);
 void update_position(struct snake* snake, int direction);
 void createfood();
 void checkifate(struct snake* snake);
@@ -45,13 +46,34 @@ void sleep_ms(int ms){
 	usleep(ms * 1000);
 }
 
+void mainloop();
+void endgame();
+
 int main()
 {
-	init();
-	createfood();
-	int should_exit = false;
-	int c =0;
 
+	init();
+	FILE* file;
+	file = fopen("./data.json", "r");
+	char data[4096];
+	fgets(data, 4096, file);
+
+	/* cJSON *json = cJSON_Parse(data); */
+	/* char *string = cJSON_Print(json); */
+
+	fclose(file);
+	mvprintw(3, 3, "%s", data);
+
+	createfood();
+	mainloop();
+	endgame();
+
+	return 0;
+}
+
+void mainloop(){
+	int should_exit = false;
+	int c = 0;
 	struct snake snake = {
 		.pos = { (position) {.x = WINDOW_SIZEX/2, .y = WINDOW_SIZEY} },
 		.icon = '0',
@@ -66,11 +88,6 @@ int main()
 	main_window = newwin(25, 50, WINDOW_POSY, WINDOW_POSX);
 	keypad(main_window, true);
 	nodelay(main_window, true);
-
-	// give it border
-	box(main_window, 0, 0);
-
-	// refresh stdscr
 	refresh();
 
 	while(!should_exit){
@@ -78,9 +95,10 @@ int main()
 		int t = wgetch(main_window);
 		if (t != ERR) c = t; 
 
-		wclear(main_window);
+		sleep_ms(110);
+
+		werase(main_window);
 		box(main_window,0,0);
-		sleep_ms(100);
 
 		switch (c) {
 			case 'q':
@@ -112,19 +130,21 @@ int main()
 				break;
 		}
 
-		update_position(&snake, direction);
+
 		checkifate(&snake);
+		update_position(&snake, direction);
 		draw_snake(main_window, &snake);
-		draw_food(main_window);
+		draw_food(main_window, &snake);
 
 		wrefresh(main_window);
-		refresh();
+		//refresh();
 	}
+}
+
+void endgame(){
 	// clear and return
 	clear();
 	endwin();
-
-	return 0;
 }
 
 void createfood(){
@@ -141,11 +161,14 @@ void checkifate(struct snake* snake){
 
 };
 
-void draw_food(WINDOW* window){
-	mvwprintw(window, food.y, food.x, "%c", '+');
+void draw_food(WINDOW* window, struct snake* snake){
+	wattron(window, COLOR_PAIR(2));
+	mvwprintw(window, food.y, food.x, "%c", snakestr[snake->len%strlen(snakestr)]);
+	wattroff(window, COLOR_PAIR(2));
 }
 
 void draw_snake(WINDOW* window, struct snake* snake){
+	wattron(window, COLOR_PAIR(1));
 	position head = snake->pos[0];
 	mvwprintw(window, 0, 15, "x: %d, y: %d", head.x, head.y);
 
@@ -153,6 +176,7 @@ void draw_snake(WINDOW* window, struct snake* snake){
 		position part = snake->pos[i];
 		mvwprintw(window, part.y, part.x, "%c", snakestr[i%strlen(snakestr)]);
 	}
+	wattroff(window, COLOR_PAIR(1));
 }
 
 void update_position(struct snake* snake, int direction){
@@ -188,6 +212,11 @@ void init(){
 	curs_set(0);
 	noecho();
 	cbreak();
+	start_color();			/* Start color 			*/
+
+	init_pair(1, COLOR_BLACK, COLOR_WHITE);
+	init_pair(2, COLOR_GREEN, COLOR_RED);
+
 	clear();
 
 	// Get screen width and height
