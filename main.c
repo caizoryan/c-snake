@@ -1,0 +1,195 @@
+#include <ctype.h>
+#include <ncurses.h>
+#include <stdlib.h>
+#include <string.h>
+#include<unistd.h>
+
+int SCREEN_WIDTH = 0;
+int SCREEN_HEIGHT = 0;
+int WINDOW_POSX = 0;
+int WINDOW_POSY = 0;
+
+ int WINDOW_SIZEX = 50;
+ int WINDOW_SIZEY = 25;
+
+#define true 1
+#define false 0
+
+enum DIRECTION {TOP, RIGHT, DOWN, LEFT};
+
+char snakestr[] = "[sexys<<<nak3sn4kesoc$$oolbabydolmonkey]";
+
+typedef struct position {
+	int x;
+	int y;
+} position;
+
+struct snake {
+	position pos[4096]; 
+	char icon;
+	int len;
+};
+
+void init();
+void sleep_ms(int ms);
+void draw_snake(WINDOW* window, struct snake* snake);
+void draw_food(WINDOW* window);
+void update_position(struct snake* snake, int direction);
+void createfood();
+void checkifate(struct snake* snake);
+
+int direction = TOP;
+position food;
+
+void sleep_ms(int ms){
+	usleep(ms * 1000);
+}
+
+int main()
+{
+	init();
+	createfood();
+	int should_exit = false;
+	int c =0;
+
+	struct snake snake = {
+		.pos = { (position) {.x = WINDOW_SIZEX/2, .y = WINDOW_SIZEY} },
+		.icon = '0',
+		.len = 5,
+	};
+
+	// make a window
+	WINDOW *main_window;
+	WINDOW_POSX = (SCREEN_WIDTH - WINDOW_SIZEX)/2;
+	WINDOW_POSY = (SCREEN_HEIGHT - WINDOW_SIZEY)/2;
+
+	main_window = newwin(25, 50, WINDOW_POSY, WINDOW_POSX);
+	keypad(main_window, true);
+	nodelay(main_window, true);
+
+	// give it border
+	box(main_window, 0, 0);
+
+	// refresh stdscr
+	refresh();
+
+	while(!should_exit){
+		// get char from a window
+		int t = wgetch(main_window);
+		if (t != ERR) c = t; 
+
+		wclear(main_window);
+		box(main_window,0,0);
+		sleep_ms(100);
+
+		switch (c) {
+			case 'q':
+				should_exit = true;
+				break;
+
+			case KEY_DOWN:
+				mvwprintw(main_window, 0,2, "PRESSED: (v)");
+				direction = DOWN;
+				break;
+
+			case KEY_UP:
+				mvwprintw(main_window, 0,2, "PRESSED: (^)");
+				direction = TOP;
+				break;
+
+			case KEY_RIGHT:
+				mvwprintw(main_window, 0,2, "PRESSED: (>)");
+				direction = RIGHT;
+				break;
+
+			case KEY_LEFT:
+				mvwprintw(main_window, 0,2, "PRESSED: (<)");
+				direction = LEFT;
+				break;
+
+			default:
+				mvprintw(WINDOW_POSY, WINDOW_POSX+2, "PRESSED: %d", c);
+				break;
+		}
+
+		update_position(&snake, direction);
+		checkifate(&snake);
+		draw_snake(main_window, &snake);
+		draw_food(main_window);
+
+		wrefresh(main_window);
+		refresh();
+	}
+	// clear and return
+	clear();
+	endwin();
+
+	return 0;
+}
+
+void createfood(){
+	food.x = (rand() % (WINDOW_SIZEX));
+	food.y = (rand() % (WINDOW_SIZEY));
+};
+
+void checkifate(struct snake* snake){
+	// compare head and food
+	if (snake->pos[0].x == food.x && snake->pos[0].y == food.y) {
+		createfood();
+		snake->len++;
+	}
+
+};
+
+void draw_food(WINDOW* window){
+	mvwprintw(window, food.y, food.x, "%c", '+');
+}
+
+void draw_snake(WINDOW* window, struct snake* snake){
+	position head = snake->pos[0];
+	mvwprintw(window, 0, 15, "x: %d, y: %d", head.x, head.y);
+
+	for(int i = 0; i < snake->len; i++){
+		position part = snake->pos[i];
+		mvwprintw(window, part.y, part.x, "%c", snakestr[i%strlen(snakestr)]);
+	}
+}
+
+void update_position(struct snake* snake, int direction){
+	// go thru len and pass on pos
+	for (int i = snake->len - 1; i > 0; i--){
+		position last_pos = snake->pos[i-1];
+		snake->pos[i] = last_pos;
+	}
+
+	position* head = &snake->pos[0];
+	switch (direction) {
+		case TOP:
+			head->y--;
+			break;
+
+		case DOWN:
+			head->y++;
+			break;
+
+		case LEFT:
+			head->x--;
+			break;
+
+		case RIGHT:
+			head->x++;
+			break;
+	}
+
+}
+
+void init(){
+	initscr();
+	curs_set(0);
+	noecho();
+	cbreak();
+	clear();
+
+	// Get screen width and height
+	getmaxyx(stdscr, SCREEN_HEIGHT, SCREEN_WIDTH);
+}
